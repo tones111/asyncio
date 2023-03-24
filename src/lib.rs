@@ -12,7 +12,7 @@ pub struct Aio {
 pub extern "C" fn aio__construct() -> *const Aio {
     println!("aio__construct");
 
-    let rt = match runtime::Builder::new_current_thread().build() {
+    let rt = match runtime::Builder::new_current_thread().enable_time().build() {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("error constructing aio instance: {e}");
@@ -40,6 +40,7 @@ pub extern "C" fn aio__construct() -> *const Aio {
 pub unsafe extern "C" fn aio__destruct(ptr: *mut Aio) {
     if !ptr.is_null() {
         let aio = Box::from_raw(ptr);
+        drop(aio.rt_handle);
         if aio.shutdown_tx.send(()).is_err() {
             eprintln!("error sending shutdown mesg");
         }
@@ -47,5 +48,19 @@ pub unsafe extern "C" fn aio__destruct(ptr: *mut Aio) {
             eprintln!("error joining rt thread: {e:?}");
         }
         println!("aio__destruct");
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn aio__sleep(ptr: *const Aio, ms: u32, cb: Option<extern "C" fn()>) {
+    if !ptr.is_null() {
+        if let Some(cb) = cb {
+            let aio = &*ptr;
+            let _guard = aio.rt_handle.enter();
+            tokio::task::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(u64::from(ms))).await;
+                cb();
+            });
+        }
     }
 }
