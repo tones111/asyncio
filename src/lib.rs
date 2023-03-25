@@ -67,8 +67,7 @@ pub unsafe extern "C" fn aio__sleep(
     if !ptr.is_null() {
         if let Some(cb) = cb {
             let aio = &*ptr;
-            let _guard = aio.rt_handle.enter();
-            tokio::task::spawn(async move {
+            aio.rt_handle.spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(u64::from(ms))).await;
                 cb(ctx);
             });
@@ -87,8 +86,7 @@ pub unsafe extern "C" fn aio__interval(
     if !ptr.is_null() {
         if let Some(cb) = cb {
             let aio = &*ptr;
-            let _guard = aio.rt_handle.enter();
-            tokio::task::spawn(async move {
+            aio.rt_handle.spawn(async move {
                 let mut interval =
                     tokio::time::interval(std::time::Duration::from_millis(u64::from(ms)));
                 loop {
@@ -103,6 +101,7 @@ pub unsafe extern "C" fn aio__interval(
 }
 
 pub struct UdpSocket {
+    rt_handle: runtime::Handle,
     sock: net::UdpSocket,
 }
 
@@ -112,14 +111,16 @@ pub unsafe extern "C" fn aio__udp_bind(ptr: *const Aio, ip: u32, port: u16) -> *
         let aio = &*ptr;
         let (tx, rx) = oneshot::channel();
 
-        let _guard = aio.rt_handle.enter();
-        tokio::task::spawn(async move {
+        aio.rt_handle.spawn(async move {
             tx.send(net::UdpSocket::bind((std::net::Ipv4Addr::from(ip), port)).await)
         });
 
         if let Ok(Ok(sock)) = rx.blocking_recv() {
             println!("UDP socket bound to {}", sock.local_addr().unwrap());
-            Box::into_raw(Box::new(UdpSocket { sock }))
+            Box::into_raw(Box::new(UdpSocket {
+                rt_handle: aio.rt_handle.clone(),
+                sock,
+            }))
         } else {
             std::ptr::null()
         }
@@ -148,6 +149,46 @@ pub unsafe extern "C" fn aio__udp_set_broadcast(ptr: *const UdpSocket, on: u8) -
             1
         } else {
             0
+        }
+    } else {
+        0
+    }
+}
+
+// Note: this function blocks since the caller is unable to determine the lifetime
+// of the buffer and can't concurrently modify it.
+#[no_mangle]
+pub unsafe extern "C" fn aio__udp_send_to(
+    ptr: *const UdpSocket,
+    buf: *const u8,
+    len: u32,
+    ip: u32,
+    port: u16,
+) -> u32 {
+    if !ptr.is_null() && !buf.is_null() {
+        let socket = &*ptr;
+        let buf = std::slice::from_raw_parts(buf, usize::try_from(len).unwrap());
+
+        let (tx, rx) = oneshot::channel();
+        socket.rt_handle.spawn(async move {
+            tx.send(
+                socket
+                    .sock
+                    .send_to(buf, (std::net::Ipv4Addr::from(ip), port))
+                    .await,
+            )
+        });
+
+        match rx.blocking_recv() {
+            Ok(Ok(len)) => u32::try_from(len).unwrap_or(0),
+            Ok(Err(e)) => {
+                eprintln!("send_to error: {e}");
+                0
+            }
+            Err(e) => {
+                eprintln!("send_to rx error: {e}");
+                0
+            }
         }
     } else {
         0

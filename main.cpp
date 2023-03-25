@@ -1,5 +1,6 @@
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <thread>
 
@@ -51,6 +52,9 @@ int main(int argc, char *argv[]) {
   UdpSocket s_orig = aio.udp_bind(0x7F000001, 1234);
   UdpSocket s = std::move(s_orig); // Note: sockets can be moved
   s.set_broadcast(true);
+  const char *mesg = "hello from c++";
+  s.send_to(reinterpret_cast<const uint8_t *>(mesg), strlen(mesg) + 1,
+            0x7FFFFFFF, 10'000);
 
   // This sleep is required to keep the application running long enough for the
   // async operations to complete.

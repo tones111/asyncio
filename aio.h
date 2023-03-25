@@ -40,6 +40,8 @@ public:
   }
 
   bool set_broadcast(bool on);
+  uint32_t send_to(const uint8_t *buf, uint32_t len, uint32_t ip,
+                   uint16_t port);
 
 private:
   UdpSocket() : sock{nullptr} {}
