@@ -71,3 +71,29 @@ pub unsafe extern "C" fn aio__sleep(
         }
     }
 }
+
+// TODO: expose MissedTickBehavior?
+#[no_mangle]
+pub unsafe extern "C" fn aio__interval(
+    ptr: *const Aio,
+    ms: u32,
+    ctx: usize,
+    cb: Option<extern "C" fn(usize) -> u8>,
+) {
+    if !ptr.is_null() {
+        if let Some(cb) = cb {
+            let aio = &*ptr;
+            let _guard = aio.rt_handle.enter();
+            tokio::task::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_millis(u64::from(ms)));
+                loop {
+                    interval.tick().await;
+                    if cb(ctx) == 0 {
+                        break;
+                    }
+                }
+            });
+        }
+    }
+}
