@@ -40,6 +40,9 @@ public:
   }
 
   bool set_broadcast(bool on);
+  void recv_from(uint32_t max_size, void *ctx,
+                 void (*cb)(void *ctx, uint8_t *buf, uint32_t len, uint32_t ip,
+                            uint16_t port));
   uint32_t send_to(const uint8_t *buf, uint32_t len, uint32_t ip,
                    uint16_t port);
 

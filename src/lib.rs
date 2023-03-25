@@ -102,7 +102,8 @@ pub unsafe extern "C" fn aio__interval(
 
 pub struct UdpSocket {
     rt_handle: runtime::Handle,
-    sock: net::UdpSocket,
+    sock: std::sync::Arc<net::UdpSocket>,
+    rx_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 #[no_mangle]
@@ -119,7 +120,8 @@ pub unsafe extern "C" fn aio__udp_bind(ptr: *const Aio, ip: u32, port: u16) -> *
             println!("UDP socket bound to {}", sock.local_addr().unwrap());
             Box::into_raw(Box::new(UdpSocket {
                 rt_handle: aio.rt_handle.clone(),
-                sock,
+                sock: std::sync::Arc::new(sock),
+                rx_handle: None,
             }))
         } else {
             std::ptr::null()
@@ -152,6 +154,52 @@ pub unsafe extern "C" fn aio__udp_set_broadcast(ptr: *const UdpSocket, on: u8) -
         }
     } else {
         0
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn aio__udp_recv_from(
+    ptr: *mut UdpSocket,
+    ctx: usize,
+    max_size: u32,
+    cb: Option<extern "C" fn(ctx: usize, buf: *mut u8, len: u32, ip: u32, port: u16)>,
+) {
+    if !ptr.is_null() {
+        let socket = &mut *ptr;
+
+        if let Some(rx_handle) = socket.rx_handle.take() {
+            rx_handle.abort();
+        }
+
+        if let Some(cb) = cb {
+            socket.rx_handle = Some(socket.rt_handle.spawn({
+                let sock = socket.sock.clone();
+                async move {
+                    let mut buf = vec![0u8; usize::try_from(max_size).unwrap()];
+                    loop {
+                        match sock.recv_from(&mut buf).await {
+                            Ok((len, std::net::SocketAddr::V4(addr))) => {
+                                cb(
+                                    ctx,
+                                    buf.as_mut_ptr(),
+                                    u32::try_from(len).unwrap_or(0),
+                                    u32::from(*addr.ip()),
+                                    addr.port(),
+                                );
+                            }
+                            Ok((_, std::net::SocketAddr::V6(_))) => {}
+                            Err(e) => {
+                                eprintln!(
+                                    "udp recv_from error for {}: {e}",
+                                    sock.local_addr().unwrap()
+                                );
+                                break;
+                            }
+                        }
+                    }
+                }
+            }));
+        }
     }
 }
 

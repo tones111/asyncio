@@ -10,6 +10,10 @@ void aio__interval(void *aio, uint32_t ms, void *ctx, uint8_t (*cb)(void *));
 void *aio__udp_bind(void *aio, uint32_t ip, uint16_t port);
 void aio__udp_destruct(void *udp);
 uint8_t aio__udp_set_broadcast(void *udp, uint8_t on);
+
+void aio__udp_recv_from(void *ctx, void *udp, uint32_t max_size,
+                        void (*cb)(void *ctx, uint8_t *buf, uint32_t len,
+                                   uint32_t ip, uint16_t port));
 uint32_t aio__udp_send_to(void *udp, const uint8_t *buf, uint32_t len,
                           uint32_t ip, uint16_t port);
 }
@@ -40,6 +44,12 @@ UdpSocket::~UdpSocket() { aio__udp_destruct(sock); }
 
 bool UdpSocket::set_broadcast(bool on) {
   return aio__udp_set_broadcast(sock, on ? 1 : 0) != 0;
+}
+
+void UdpSocket::recv_from(uint32_t max_size, void *ctx,
+                          void (*cb)(void *ctx, uint8_t *buf, uint32_t len,
+                                     uint32_t ip, uint16_t port)) {
+  aio__udp_recv_from(sock, ctx, max_size, cb);
 }
 
 uint32_t UdpSocket::send_to(const uint8_t *buf, uint32_t len, uint32_t ip,
