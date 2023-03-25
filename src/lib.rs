@@ -1,6 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use tokio::{runtime, sync::oneshot};
+use tokio::{net, runtime, sync::oneshot};
 
 pub struct Aio {
     rt_handle: runtime::Handle,
@@ -12,7 +12,11 @@ pub struct Aio {
 pub extern "C" fn aio__construct() -> *const Aio {
     println!("aio__construct");
 
-    let rt = match runtime::Builder::new_current_thread().enable_time().build() {
+    let rt = match runtime::Builder::new_current_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+    {
         Ok(rt) => rt,
         Err(e) => {
             eprintln!("error constructing aio instance: {e}");
@@ -95,5 +99,57 @@ pub unsafe extern "C" fn aio__interval(
                 }
             });
         }
+    }
+}
+
+pub struct UdpSocket {
+    sock: net::UdpSocket,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn aio__udp_bind(ptr: *const Aio, ip: u32, port: u16) -> *const UdpSocket {
+    if !ptr.is_null() {
+        let aio = &*ptr;
+        let (tx, rx) = oneshot::channel();
+
+        let _guard = aio.rt_handle.enter();
+        tokio::task::spawn(async move {
+            tx.send(net::UdpSocket::bind((std::net::Ipv4Addr::from(ip), port)).await)
+        });
+
+        if let Ok(Ok(sock)) = rx.blocking_recv() {
+            println!("UDP socket bound to {}", sock.local_addr().unwrap());
+            Box::into_raw(Box::new(UdpSocket { sock }))
+        } else {
+            std::ptr::null()
+        }
+    } else {
+        std::ptr::null()
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn aio__udp_destruct(ptr: *mut UdpSocket) {
+    if !ptr.is_null() {
+        let socket = Box::from_raw(ptr);
+        println!(
+            "destructing UDP socket at {}",
+            socket.sock.local_addr().unwrap()
+        );
+        drop(socket);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn aio__udp_set_broadcast(ptr: *const UdpSocket, on: u8) -> u8 {
+    if !ptr.is_null() {
+        let socket = &*ptr;
+        if socket.sock.set_broadcast(on != 0).is_ok() {
+            1
+        } else {
+            0
+        }
+    } else {
+        0
     }
 }

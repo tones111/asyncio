@@ -48,6 +48,10 @@ int main(int argc, char *argv[]) {
     });
   }).join();
 
+  UdpSocket s_orig = aio.udp_bind(0x7F000001, 1234);
+  UdpSocket s = std::move(s_orig); // Note: sockets can be moved
+  s.set_broadcast(true);
+
   // This sleep is required to keep the application running long enough for the
   // async operations to complete.
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
