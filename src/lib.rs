@@ -51,15 +51,22 @@ pub unsafe extern "C" fn aio__destruct(ptr: *mut Aio) {
     }
 }
 
+// Note: Rust can't track the lifetime of raw pointers and thus won't let us pass
+// it across threads here (not Send), so we cheat and receive it as a usize.
 #[no_mangle]
-pub unsafe extern "C" fn aio__sleep(ptr: *const Aio, ms: u32, cb: Option<extern "C" fn()>) {
+pub unsafe extern "C" fn aio__sleep(
+    ptr: *const Aio,
+    ms: u32,
+    ctx: usize,
+    cb: Option<extern "C" fn(usize)>,
+) {
     if !ptr.is_null() {
         if let Some(cb) = cb {
             let aio = &*ptr;
             let _guard = aio.rt_handle.enter();
             tokio::task::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(u64::from(ms))).await;
-                cb();
+                cb(ctx);
             });
         }
     }
