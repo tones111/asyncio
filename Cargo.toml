@@ -9,4 +9,4 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
-tokio = { version = "1", features = ["net", "rt", "sync", "time"] }
+tokio = { version = "1", features = ["full"] }
