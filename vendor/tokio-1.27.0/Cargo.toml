@@ -122,11 +122,11 @@ net = [
     "mio/os-ext",
     "mio/net",
     "socket2",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_Security",
-    "windows-sys/Win32_Storage_FileSystem",
-    "windows-sys/Win32_System_Pipes",
-    "windows-sys/Win32_System_SystemServices",
+    #"windows-sys/Win32_Foundation",
+    #"windows-sys/Win32_Security",
+    #"windows-sys/Win32_Storage_FileSystem",
+    #"windows-sys/Win32_System_Pipes",
+    #"windows-sys/Win32_System_SystemServices",
 ]
 process = [
     "bytes",
@@ -135,9 +135,9 @@ process = [
     "mio/os-ext",
     "mio/net",
     "signal-hook-registry",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_System_Threading",
-    "windows-sys/Win32_System_WindowsProgramming",
+    #"windows-sys/Win32_Foundation",
+    #"windows-sys/Win32_System_Threading",
+    #"windows-sys/Win32_System_WindowsProgramming",
 ]
 rt = []
 rt-multi-thread = [
@@ -150,8 +150,8 @@ signal = [
     "mio/net",
     "mio/os-ext",
     "signal-hook-registry",
-    "windows-sys/Win32_Foundation",
-    "windows-sys/Win32_System_Console",
+    #"windows-sys/Win32_Foundation",
+    #"windows-sys/Win32_System_Console",
 ]
 stats = []
 sync = []
@@ -165,12 +165,12 @@ time = []
 [target."cfg(all(any(target_arch = \"wasm32\", target_arch = \"wasm64\"), not(target_os = \"wasi\")))".dev-dependencies.wasm-bindgen-test]
 version = "0.3.0"
 
-[target."cfg(docsrs)".dependencies.windows-sys]
-version = "0.45"
-features = [
-    "Win32_Foundation",
-    "Win32_Security_Authorization",
-]
+#[target."cfg(docsrs)".dependencies.windows-sys]
+#version = "0.45"
+#features = [
+#    "Win32_Foundation",
+#    "Win32_Security_Authorization",
+#]
 
 [target."cfg(loom)".dev-dependencies.loom]
 version = "0.5.2"
@@ -222,9 +222,9 @@ features = [
 ]
 default-features = false
 
-[target."cfg(windows)".dependencies.windows-sys]
-version = "0.45"
-optional = true
+#[target."cfg(windows)".dependencies.windows-sys]
+#version = "0.45"
+#optional = true
 
 [target."cfg(windows)".dev-dependencies.ntapi]
 version = "0.3.6"
